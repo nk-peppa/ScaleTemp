@@ -1,0 +1,16 @@
+build/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+data/raw_data/*
+data/processed_data/*
+data/figures/*
+data/calibration/*
+data/logs/*
+!data/raw_data/.gitkeep
+!data/processed_data/.gitkeep
+!data/figures/.gitkeep
+!data/calibration/.gitkeep
+!data/logs/.gitkeep
