@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ScaleTemp Experiments</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="dot purple"></span><div><b>实验数据测算</b><small>Interactive workflow assistant</small></div></div>
+  <nav class="actions"><a class="button" href="/">返回仪表盘</a></nav>
+</header>
+<main class="experiment-shell">
+  <section class="workflow-card">
+    <h1>HX711 + CZL611N 实验助手</h1>
+    <p class="muted">按步骤放置/移除载荷。每个实验会分别采集实时传感器数据，自动保存 CSV，并生成 SVG/PDF 科研风格图像。</p>
+    <div class="steps">
+      <button data-exp="calibration" data-prompt="移除所有重量，随后按质量列表逐个放置标准砝码。">[1] Calibration</button>
+      <button data-exp="filtering" data-prompt="放置稳定载荷并保持系统静止。">[2] Filtering Test</button>
+      <button data-exp="dynamic" data-prompt="准备快速放置 500g 载荷，点击开始后执行阶跃。">[3] Dynamic Response</button>
+      <button data-exp="repeatability" data-prompt="重复放置相同载荷，系统将记录多次试验。">[4] Repeatability</button>
+      <button data-exp="drift" data-prompt="放置恒定载荷，长时间保持不动。">[5] Creep/Drift</button>
+      <button data-exp="auto_zero" data-prompt="立即移除所有重量，测量回零过程。">[6] Auto-zero</button>
+    </div>
+  </section>
+  <section class="card run-panel">
+    <h2 id="expTitle">选择实验</h2>
+    <p id="expPrompt" class="prompt">Select an experiment from the left.</p>
+    <form id="expForm" class="experiment-form">
+      <label>采集时长 / Duration (s)<input name="duration_s" type="number" min="1" step="1" value="5" /></label>
+      <label>校准质量列表 / Masses (g)<input name="masses" value="0,100,200,500,1000" /></label>
+      <label>重复次数 / Trials<input name="trials" type="number" min="1" step="1" value="5" /></label>
+      <button class="primary" type="submit">开始采集并生成图像</button>
+    </form>
+    <div id="countdown" class="countdown"></div>
+    <div id="result" class="result"></div>
+  </section>
+</main>
+<script src="/static/experiments.js"></script>
+</body>
+</html>
