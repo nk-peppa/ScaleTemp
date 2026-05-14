@@ -29,14 +29,20 @@ class HX711Sampler:
     def __init__(self, command: list[str] | None = None, history_size: int = 6000) -> None:
         root = Path(__file__).resolve().parents[3]
         default_binary = root / "build" / "hx711_sampler"
-        self.mode = os.getenv("SCALETEMP_SENSOR_MODE", "mock")
+        self.mode = os.getenv("SCALETEMP_SENSOR_MODE", "wiringpi")
         self.last_error = ""
         if command is None and self.mode == "sysfs":
             data_gpio = os.environ["SCALETEMP_DATA_GPIO"]
             sck_gpio = os.environ["SCALETEMP_SCK_GPIO"]
             command = [str(default_binary), "--sysfs", data_gpio, sck_gpio, os.getenv("SCALETEMP_GAIN_PULSES", "1")]
-        self.command = command or [str(default_binary), "--mock", os.getenv("SCALETEMP_MOCK_HZ", "80")]
-        self.mode = "sysfs" if "--sysfs" in self.command else "mock" if "--mock" in self.command else self.mode
+        elif command is None and self.mode == "mock":
+            command = [str(default_binary), "--mock", os.getenv("SCALETEMP_MOCK_HZ", "80")]
+        elif command is None:
+            data_pin = os.getenv("SCALETEMP_DATA_PIN", "5")
+            sck_pin = os.getenv("SCALETEMP_SCK_PIN", "1")
+            command = [str(default_binary), "--wiringpi", data_pin, sck_pin, os.getenv("SCALETEMP_GAIN_PULSES", "1")]
+        self.command = command
+        self.mode = "sysfs" if "--sysfs" in self.command else "mock" if "--mock" in self.command else "wiringpi" if "--wiringpi" in self.command else self.mode
         self.history: Deque[RawSample] = deque(maxlen=history_size)
         self.process: subprocess.Popen[str] | None = None
         self.thread: threading.Thread | None = None

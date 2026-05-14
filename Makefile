@@ -2,7 +2,7 @@
 
 build:
 	mkdir -p build
-	cc -O3 -std=c11 -Wall -Wextra -o build/hx711_sampler native/hx711_sampler.c -lm
+	cc -O3 -std=c11 -Wall -Wextra -o build/hx711_sampler native/hx711_sampler.c -lm -ldl
 
 clean:
 	rm -rf build .pytest_cache **/__pycache__

@@ -74,23 +74,37 @@ http://<Orange-Pi-IP>:8000
 
 ## 硬件运行配置
 
-默认使用 mock 数据，方便无硬件开发和演示；如果你没有显式传入 GPIO，页面看到的一定是模拟数据。连接真实 HX711 后推荐直接传入 Linux GPIO 编号：
+默认启动即使用真实 HX711 硬件，接口与最初的 wiringPi C 程序一致：
+
+- `DT/DOUT = wiringPi 5`
+- `SCK/PD_SCK = wiringPi 1`
+- `GAIN_PULSES = 1`（A 通道 128 增益）
+
+因此一键启动真实硬件：
 
 ```bash
-./scripts/start_web.sh --hardware <DOUT_GPIO_NUMBER> <PD_SCK_GPIO_NUMBER> 1
-```
-
-也可以使用环境变量启用 sysfs GPIO：
-
-```bash
-export SCALETEMP_SENSOR_MODE=sysfs
-export SCALETEMP_DATA_GPIO=<DOUT_GPIO_NUMBER>
-export SCALETEMP_SCK_GPIO=<PD_SCK_GPIO_NUMBER>
-export SCALETEMP_GAIN_PULSES=1   # 1=A通道128增益, 2=B通道32增益, 3=A通道64增益
 ./scripts/start_web.sh
 ```
 
-> Orange Pi 的引脚编号需按系统暴露的 Linux GPIO 编号填写，不是物理排针序号。启动后右侧状态卡会显示 `Sensor: sysfs` 表示真实硬件后端；若显示 `Sensor: mock`，说明仍在模拟模式。若系统禁用 sysfs GPIO，需在系统中启用 sysfs GPIO 或将 `native/hx711_sampler.c` 扩展到该系统支持的 GPIO 后端。
+如果要显式指定同一组 wiringPi 引脚：
+
+```bash
+./scripts/start_web.sh --pins 5 1 1
+```
+
+模拟数据必须显式指定：
+
+```bash
+./scripts/start_web.sh --mock
+```
+
+如需改用 Linux sysfs GPIO 编号而不是 wiringPi 编号：
+
+```bash
+./scripts/start_web.sh --sysfs <DOUT_GPIO_NUMBER> <PD_SCK_GPIO_NUMBER> 1
+```
+
+> `--pins` 使用 wiringPi 编号，匹配原始代码里的 `wiringPiSetup()`、`#define DT 5`、`#define SCK 1`。`--sysfs` 才使用 Linux GPIO 编号。启动后右侧状态卡显示 `Sensor: wiringpi` 表示真实 wiringPi 硬件后端；显示 `Sensor: mock` 才是模拟模式。
 
 ## Web 使用说明
 
