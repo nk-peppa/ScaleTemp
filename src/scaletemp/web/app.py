@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, AsyncIterator
 
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,29 +17,33 @@ from scaletemp.processing.service import ScaleService
 PACKAGE_DIR = Path(__file__).resolve().parent
 service = ScaleService()
 runner = ExperimentRunner(service)
-app = FastAPI(title="ScaleTemp HX711 Dashboard")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start and stop the sampler using FastAPI's non-deprecated lifespan API."""
+
+    del app
+    service.start()
+    try:
+        yield
+    finally:
+        service.stop()
+
+
+app = FastAPI(title="ScaleTemp HX711 Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
 
-@app.on_event("startup")
-def startup() -> None:
-    service.start()
-
-
-@app.on_event("shutdown")
-def shutdown() -> None:
-    service.stop()
-
-
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
 
 
 @app.get("/experiments", response_class=HTMLResponse)
 def experiments(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("experiments.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="experiments.html", context={})
 
 
 @app.get("/api/readings")
@@ -87,7 +92,7 @@ def download(path: str) -> FileResponse:
     target = Path(path).resolve()
     data_root = Path("data").resolve()
     if data_root not in target.parents and target != data_root:
-        raise ValueError("download path must be inside data directory")
+        raise HTTPException(status_code=400, detail="download path must be inside data directory")
     return FileResponse(target, filename=target.name)
 
 
