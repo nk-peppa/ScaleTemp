@@ -56,7 +56,9 @@ static int export_gpio(int gpio) {
     if (access(path, F_OK) == 0) return 0;
     char value[32];
     snprintf(value, sizeof(value), "%d", gpio);
-    return write_text("/sys/class/gpio/export", value);
+    int rc = write_text("/sys/class/gpio/export", value);
+    sleep_us(100000);
+    return rc;
 }
 
 static int set_direction(int gpio, const char *direction) {
@@ -149,6 +151,7 @@ static int run_sysfs(int data_gpio, int sck_gpio, int gain_pulses) {
         return 2;
     }
     set_value_fd(sck_fd, 0);
+    fprintf(stderr, "HX711 sysfs backend active: DATA_GPIO=%d SCK_GPIO=%d gain_pulses=%d\n", data_gpio, sck_gpio, gain_pulses);
     uint64_t seq = 0;
     while (keep_running) {
         int32_t raw = 0;

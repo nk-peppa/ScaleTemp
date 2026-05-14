@@ -83,6 +83,15 @@ def calibration_point(grams: Annotated[float, Form()]) -> dict:
     return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points()}
 
 
+@app.delete("/api/calibration-point/{index}")
+def delete_calibration_point(index: int) -> dict:
+    try:
+        model = service.remove_calibration_point(index)
+    except IndexError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points()}
+
+
 @app.post("/api/experiment/{name}")
 def run_experiment(name: str, duration_s: Annotated[float, Form()] = 5.0, masses: Annotated[str, Form()] = "0,100,200,500,1000", trials: Annotated[int, Form()] = 5) -> JSONResponse:
     if name == "calibration":

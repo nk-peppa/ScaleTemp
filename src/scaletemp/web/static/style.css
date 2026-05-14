@@ -47,3 +47,6 @@ pre { white-space:pre-wrap; color:var(--accent); font-size:12px; }
 .calibration-point-card span { color:var(--muted); font-size:12px; }
 .calibration-point-card strong { display:block; color:var(--accent); font-size:20px; margin-top:6px; }
 .calibration-point-card small, .empty-card { color:var(--muted); }
+.calibration-point-card { position:relative; }
+.delete-calibration { position:absolute; top:8px; right:8px; width:24px; height:24px; padding:0; border-radius:999px; display:grid; place-items:center; line-height:1; color:#fecdd3; background:rgba(251,113,133,.13); border-color:rgba(251,113,133,.35); }
+.delete-calibration:hover { border-color:rgba(251,113,133,.8); transform:none; }

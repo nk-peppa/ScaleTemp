@@ -29,15 +29,18 @@ class HX711Sampler:
     def __init__(self, command: list[str] | None = None, history_size: int = 6000) -> None:
         root = Path(__file__).resolve().parents[3]
         default_binary = root / "build" / "hx711_sampler"
-        mode = os.getenv("SCALETEMP_SENSOR_MODE", "mock")
-        if command is None and mode == "sysfs":
+        self.mode = os.getenv("SCALETEMP_SENSOR_MODE", "mock")
+        self.last_error = ""
+        if command is None and self.mode == "sysfs":
             data_gpio = os.environ["SCALETEMP_DATA_GPIO"]
             sck_gpio = os.environ["SCALETEMP_SCK_GPIO"]
             command = [str(default_binary), "--sysfs", data_gpio, sck_gpio, os.getenv("SCALETEMP_GAIN_PULSES", "1")]
         self.command = command or [str(default_binary), "--mock", os.getenv("SCALETEMP_MOCK_HZ", "80")]
+        self.mode = "sysfs" if "--sysfs" in self.command else "mock" if "--mock" in self.command else self.mode
         self.history: Deque[RawSample] = deque(maxlen=history_size)
         self.process: subprocess.Popen[str] | None = None
         self.thread: threading.Thread | None = None
+        self.error_thread: threading.Thread | None = None
         self.running = False
 
     def start(self) -> None:
@@ -47,6 +50,8 @@ class HX711Sampler:
         self.running = True
         self.thread = threading.Thread(target=self._reader, daemon=True)
         self.thread.start()
+        self.error_thread = threading.Thread(target=self._stderr_reader, daemon=True)
+        self.error_thread.start()
 
     def stop(self) -> None:
         self.running = False
@@ -69,6 +74,11 @@ class HX711Sampler:
                 self.history.append(RawSample(int(parts[0]), int(parts[1]), int(parts[2]), parts[3]))
             except ValueError:
                 continue
+
+    def _stderr_reader(self) -> None:
+        assert self.process and self.process.stderr
+        for line in self.process.stderr:
+            self.last_error = line.strip()
 
     def snapshot(self, n: int = 200) -> list[RawSample]:
         return list(self.history)[-n:]

@@ -60,6 +60,7 @@ function renderCalibrationCards(points){
       <span>#${idx + 1}</span>
       <strong>${Number(p.grams).toFixed(2)} g</strong>
       <small>Raw ${Math.round(Number(p.raw))}</small>
+      <button class="delete-calibration" data-index="${idx}" title="Delete calibration point">×</button>
     </div>`).join('');
 }
 
@@ -86,6 +87,8 @@ async function refresh(){
   }
   document.getElementById('weightNow').textContent = `${data.reading.grams.toFixed(2)} g`;
   document.getElementById('rawNow').textContent = `Raw: ${data.reading.raw_adc} | Filtered: ${data.reading.filtered_raw.toFixed(1)}`;
+  const sensor = data.sensor || {};
+  document.getElementById('sensorMode').textContent = `Sensor: ${sensor.mode || '--'}${sensor.error ? ' | ' + sensor.error : ''}`;
   const badge = document.getElementById('stableBadge');
   badge.textContent = data.reading.stable ? 'STABLE' : 'UNSTABLE';
   badge.className = data.reading.stable ? 'badge stable' : 'badge unstable';
@@ -114,3 +117,13 @@ document.getElementById('calibrationForm').onsubmit = async e => {
   e.target.reset();
   refresh();
 };
+
+
+document.getElementById('calibrationCards').addEventListener('click', async event => {
+  const button = event.target.closest('.delete-calibration');
+  if (!button) return;
+  const index = button.dataset.index;
+  const data = await fetch(`/api/calibration-point/${index}`, {method:'DELETE'}).then(r=>r.json());
+  renderCalibrationCards(data.calibration_points);
+  refresh();
+});

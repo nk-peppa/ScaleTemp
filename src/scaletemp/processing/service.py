@@ -30,10 +30,13 @@ class ScaleService:
         self.calibration_path = data_dir / "calibration" / "current_calibration.json"
         self.calibration = self._load_calibration()
 
+    def _default_calibration(self) -> CalibrationModel:
+        return CalibrationModel([0.0, 100000.0], [0.0, 1000.0], [0.01, 0.0], 1)
+
     def _load_calibration(self) -> CalibrationModel:
         if self.calibration_path.exists():
             return CalibrationModel.load(self.calibration_path)
-        return CalibrationModel([0.0, 100000.0], [0.0, 1000.0], [0.01, 0.0], 1)
+        return self._default_calibration()
 
     def start(self) -> None:
         self.sampler.start()
@@ -60,6 +63,20 @@ class ScaleService:
         raw_points = list(self.calibration.raw_points) + [corrected_raw]
         gram_points = list(self.calibration.gram_points) + [grams]
         self.calibration = fit_piecewise_overlapping(raw_points, gram_points)
+        self.calibration.save(self.calibration_path)
+        return self.calibration
+
+    def remove_calibration_point(self, index: int) -> CalibrationModel:
+        raw_points = list(self.calibration.raw_points)
+        gram_points = list(self.calibration.gram_points)
+        if index < 0 or index >= len(raw_points):
+            raise IndexError("calibration point index out of range")
+        del raw_points[index]
+        del gram_points[index]
+        if raw_points:
+            self.calibration = fit_piecewise_overlapping(raw_points, gram_points)
+        else:
+            self.calibration = self._default_calibration()
         self.calibration.save(self.calibration_path)
         return self.calibration
 
@@ -92,6 +109,7 @@ class ScaleService:
             "conversion_curve": {"raw": conversion_x, "grams": conversion_y},
             "calibration_points": self.calibration_points(),
             "reading": self.reading().__dict__,
+            "sensor": {"mode": self.sampler.mode, "command": self.sampler.command, "error": self.sampler.last_error},
         }
 
     def calibration_points(self) -> list[dict[str, float]]:
@@ -122,6 +140,9 @@ class ScaleService:
             "calibration_degree": self.calibration.degree,
             "calibration_points": len(self.calibration.raw_points),
             "calibration_point_cards": self.calibration_points(),
+            "sensor_mode": self.sampler.mode,
+            "sensor_command": self.sampler.command,
+            "sensor_error": self.sampler.last_error,
         }
 
     def save_metadata(self, path: Path, extra: dict) -> None:
