@@ -42,3 +42,8 @@ pre { white-space:pre-wrap; color:var(--accent); font-size:12px; }
 .countdown { min-height:34px; font-size:28px; color:var(--accent); font-weight:800; }
 .result a { color:var(--accent); display:inline-block; margin:5px 10px 5px 0; }
 @media (max-width: 980px) { .layout, .experiment-shell { grid-template-columns:1fr; } .topbar { height:auto; padding:16px; flex-wrap:wrap; gap:14px; } }
+.calibration-cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap:10px; margin-top:14px; }
+.calibration-point-card, .empty-card { border:1px solid rgba(255,255,255,.08); background:rgba(8,11,18,.72); border-radius:16px; padding:12px; min-height:78px; }
+.calibration-point-card span { color:var(--muted); font-size:12px; }
+.calibration-point-card strong { display:block; color:var(--accent); font-size:20px; margin-top:6px; }
+.calibration-point-card small, .empty-card { color:var(--muted); }

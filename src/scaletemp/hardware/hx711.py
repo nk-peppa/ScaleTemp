@@ -8,7 +8,7 @@ import os
 import subprocess
 import threading
 import time
-from typing import Deque, Iterator
+from typing import Deque
 
 
 @dataclass
@@ -26,7 +26,7 @@ class HX711Sampler:
     forwards raw samples to processing/UI layers.
     """
 
-    def __init__(self, command: list[str] | None = None, history_size: int = 2000) -> None:
+    def __init__(self, command: list[str] | None = None, history_size: int = 6000) -> None:
         root = Path(__file__).resolve().parents[3]
         default_binary = root / "build" / "hx711_sampler"
         mode = os.getenv("SCALETEMP_SENSOR_MODE", "mock")

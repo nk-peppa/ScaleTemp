@@ -42,8 +42,10 @@ class ScaleService:
         self.sampler.stop()
 
     def set_filter_strength(self, strength: float) -> None:
-        strength = min(max(strength, 0.0), 1.0)
-        self.filter_alpha = 0.55 - 0.50 * strength
+        # Extended range: 0.0 is fastest response, 2.0 is strongest smoothing.
+        strength = min(max(strength, 0.0), 2.0)
+        self.filter_alpha = 0.55 - 0.27 * strength
+        self.filter_alpha = min(max(self.filter_alpha, 0.01), 0.55)
 
     def tare(self) -> float:
         samples = self.sampler.snapshot(120)
@@ -54,7 +56,8 @@ class ScaleService:
     def add_calibration_point(self, grams: float) -> CalibrationModel:
         samples = self.sampler.snapshot(160)
         raw = float(np.mean([s.raw_adc for s in samples])) if samples else 0.0
-        raw_points = list(self.calibration.raw_points) + [raw]
+        corrected_raw = raw - self.zero_offset
+        raw_points = list(self.calibration.raw_points) + [corrected_raw]
         gram_points = list(self.calibration.gram_points) + [grams]
         self.calibration = fit_piecewise_overlapping(raw_points, gram_points)
         self.calibration.save(self.calibration_path)
@@ -72,18 +75,45 @@ class ScaleService:
         return ScaleReading(time.time(), int(raw[-1]), float(filtered[-1]), float(grams), stable)
 
     def chart_payload(self) -> dict:
-        samples = self.sampler.snapshot(260)
+        samples = self.sampler.snapshot(6000)
+        if samples:
+            newest_s = samples[-1].unix_time_ns / 1e9
+            samples = [s for s in samples if newest_s - (s.unix_time_ns / 1e9) <= 30.0]
         raw = np.asarray([s.raw_adc for s in samples], dtype=float)
         timestamps = [(s.unix_time_ns / 1e9) for s in samples]
         filtered = ema_filter(raw, self.filter_alpha) if raw.size else np.asarray([])
         grams = [piecewise_predict(self.calibration, v - self.zero_offset) for v in filtered]
+        conversion_x, conversion_y = self.conversion_curve(raw, filtered)
         return {
             "t": timestamps,
             "raw": raw.tolist(),
             "filtered": filtered.tolist(),
             "grams": grams,
+            "conversion_curve": {"raw": conversion_x, "grams": conversion_y},
+            "calibration_points": self.calibration_points(),
             "reading": self.reading().__dict__,
         }
+
+    def calibration_points(self) -> list[dict[str, float]]:
+        return [
+            {"raw": float(raw + self.zero_offset), "corrected_raw": float(raw), "grams": float(grams)}
+            for raw, grams in zip(self.calibration.raw_points, self.calibration.gram_points)
+        ]
+
+    def conversion_curve(self, raw: np.ndarray, filtered: np.ndarray) -> tuple[list[float], list[float]]:
+        point_candidates = [point + self.zero_offset for point in self.calibration.raw_points]
+        if raw.size:
+            point_candidates.extend(raw.tolist())
+        if filtered.size:
+            point_candidates.append(float(filtered[-1]))
+        if not point_candidates:
+            point_candidates = [0.0, 100000.0]
+        lo = float(min(point_candidates))
+        hi = float(max(point_candidates))
+        span = max(hi - lo, 1000.0)
+        xs = np.linspace(lo - 0.08 * span, hi + 0.08 * span, 180)
+        ys = [piecewise_predict(self.calibration, x - self.zero_offset) for x in xs]
+        return xs.tolist(), ys
 
     def metadata(self) -> dict:
         return {
@@ -91,6 +121,7 @@ class ScaleService:
             "filter_alpha": self.filter_alpha,
             "calibration_degree": self.calibration.degree,
             "calibration_points": len(self.calibration.raw_points),
+            "calibration_point_cards": self.calibration_points(),
         }
 
     def save_metadata(self, path: Path, extra: dict) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import socket
 from typing import Annotated, AsyncIterator
 
 from fastapi import FastAPI, Form, HTTPException
@@ -36,9 +37,21 @@ app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
 
+def current_ip_address() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return "127.0.0.1"
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"current_ip": current_ip_address()})
 
 
 @app.get("/experiments", response_class=HTMLResponse)
@@ -48,7 +61,9 @@ def experiments(request: Request) -> HTMLResponse:
 
 @app.get("/api/readings")
 def readings() -> dict:
-    return service.chart_payload()
+    payload = service.chart_payload()
+    payload["current_ip"] = current_ip_address()
+    return payload
 
 
 @app.post("/api/tare")
@@ -65,7 +80,7 @@ def filter_strength(strength: Annotated[float, Form()]) -> dict:
 @app.post("/api/calibration-point")
 def calibration_point(grams: Annotated[float, Form()]) -> dict:
     model = service.add_calibration_point(grams)
-    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients}
+    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points()}
 
 
 @app.post("/api/experiment/{name}")
