@@ -43,12 +43,17 @@ class ExperimentRunner:
         return df
 
     def calibration(self, masses: list[float], duration_s: float = 3.0) -> ExperimentResult:
+        groups = [(mass, self.service.sampler.collect(duration_s)) for mass in masses]
+        return self.calibration_from_groups(groups, duration_s)
+
+    def calibration_from_groups(self, groups, duration_s: float = 3.0) -> ExperimentResult:
         raw_means: list[float] = []
         grams: list[float] = []
         all_samples = []
-        for mass in masses:
-            samples = self.service.sampler.collect(duration_s)
+        for mass, samples in groups:
             values = reject_outliers(np.asarray([s.raw_adc for s in samples], dtype=float))
+            if values.size == 0:
+                values = np.asarray([0.0])
             raw_means.append(float(np.mean(values)))
             grams.append(float(mass))
             all_samples.extend(samples)
@@ -61,14 +66,20 @@ class ExperimentRunner:
         model = fit_piecewise_overlapping(raw_means, grams)
         model.save(self.root / "calibration" / "current_calibration.json")
         self.service.calibration = model
-        x = np.asarray(raw_means)
-        y = np.asarray(grams)
-        fits = {f"Order {d}": np.polyfit(x, y, d) for d in range(1, min(5, len(x) - 1) + 1)}
+        x = np.asarray(raw_means, dtype=float)
+        y = np.asarray(grams, dtype=float)
+        fits = {}
+        for d in range(1, min(5, len(np.unique(x)) - 1) + 1):
+            try:
+                fits[f"Order {d}"] = np.polyfit(x, y, d)
+            except np.linalg.LinAlgError:
+                continue
         fig_dir = self.root / "figures" / stamp
+        rmse = polynomial_rmse(x, y)
         figures = [
             line_plot(grams, {"Raw ADC mean": raw_means}, "Raw ADC vs weight", "Mass (g)", "Raw ADC count", fig_dir, "raw_adc_vs_weight"),
-            scatter_with_fit(x, y, fits, fig_dir, "calibration_fitting_comparison"),
-            bar_plot([str(k) for k in polynomial_rmse(x, y).keys()], list(polynomial_rmse(x, y).values()), "Polynomial order vs RMSE", "RMSE (g)", fig_dir, "polynomial_order_rmse"),
+            scatter_with_fit(x, y, fits or {"Current model": np.asarray(model.coefficients)}, fig_dir, "calibration_fitting_comparison"),
+            bar_plot([str(k) for k in rmse.keys()] or ["0"], list(rmse.values()) or [0.0], "Polynomial order vs RMSE", "RMSE (g)", fig_dir, "polynomial_order_rmse"),
         ]
         for d, coeff in fits.items():
             residual = np.polyval(coeff, x) - y
@@ -134,12 +145,17 @@ class ExperimentRunner:
         return ExperimentResult("dynamic", str(raw_path), str(processed_path), figures, meta)
 
     def repeatability(self, trials: int = 5, duration_s: float = 2.0) -> ExperimentResult:
+        groups = [self.service.sampler.collect(duration_s) for _ in range(trials)]
+        return self.repeatability_from_groups(groups, duration_s)
+
+    def repeatability_from_groups(self, groups, duration_s: float = 2.0) -> ExperimentResult:
         rows = []
         all_samples = []
-        for trial in range(1, trials + 1):
-            samples = self.service.sampler.collect(duration_s)
+        for trial, samples in enumerate(groups, start=1):
             all_samples.extend(samples)
             values = reject_outliers(np.asarray([s.raw_adc for s in samples], dtype=float))
+            if values.size == 0:
+                values = np.asarray([0.0])
             rows.append({"trial": trial, "raw_mean": float(np.mean(values)), "raw_std": float(np.std(values))})
         stamp = self._stamp("repeatability")
         raw_path = self.root / "raw_data" / f"{stamp}.csv"
@@ -152,7 +168,7 @@ class ExperimentRunner:
             line_plot(processed["trial"], {"Trial mean": processed["raw_mean"]}, "Repeatability scatter plot", "Trial", "Mean raw ADC", fig_dir, "repeatability_scatter"),
             bar_plot([str(i) for i in processed["trial"]], processed["raw_std"].tolist(), "Repeatability statistical summary", "STD (ADC counts)", fig_dir, "repeatability_stats"),
         ]
-        return ExperimentResult("repeatability", str(raw_path), str(processed_path), figures, {"trials": trials, "duration_s": duration_s})
+        return ExperimentResult("repeatability", str(raw_path), str(processed_path), figures, {"trials": len(groups), "duration_s": duration_s})
 
     def drift(self, duration_s: float = 600.0) -> ExperimentResult:
         samples = self.service.sampler.collect(duration_s)

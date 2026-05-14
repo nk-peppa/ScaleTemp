@@ -27,6 +27,7 @@ class ScaleService:
         self.sampler = sampler or HX711Sampler()
         self.zero_offset = 0.0
         self.filter_alpha = 0.22
+        self.filter_window_limit = 10000.0
         self.calibration_path = data_dir / "calibration" / "current_calibration.json"
         self.calibration = self._load_calibration()
 
@@ -50,10 +51,45 @@ class ScaleService:
         self.filter_alpha = 0.55 - 0.27 * strength
         self.filter_alpha = min(max(self.filter_alpha, 0.01), 0.55)
 
+    def set_filter_window_limit(self, limit: float) -> None:
+        self.filter_window_limit = min(max(float(limit), 0.0), 10000.0)
+
+    def _limited_ema_series(self, raw: np.ndarray) -> np.ndarray:
+        if raw.size == 0:
+            return np.asarray([])
+        if self.filter_window_limit >= 10000.0:
+            return ema_filter(raw, self.filter_alpha)
+        out = np.empty_like(raw, dtype=float)
+        for i in range(raw.size):
+            window = raw[: i + 1]
+            kept = window[np.abs(window - raw[i]) <= self.filter_window_limit]
+            if kept.size == 0:
+                kept = np.asarray([raw[i]], dtype=float)
+            out[i] = ema_filter(kept, self.filter_alpha)[-1]
+        return out
+
     def tare(self) -> float:
         samples = self.sampler.snapshot(120)
         if samples:
-            self.zero_offset = float(np.mean([s.raw_adc for s in samples]))
+            old_offset = self.zero_offset
+            new_offset = float(np.mean([s.raw_adc for s in samples]))
+            # Calibration raw_points are stored in the corrected coordinate system
+            # (physical_raw - zero_offset). When tare changes the global offset,
+            # shift existing points so they keep representing the same physical raw
+            # locations while the current load becomes 0 g.
+            delta = old_offset - new_offset
+            raw_points = [float(raw + delta) for raw in self.calibration.raw_points]
+            gram_points = list(self.calibration.gram_points)
+            # Ensure the tare moment itself is a 0 g calibration anchor.
+            zero_idx = next((i for i, raw in enumerate(raw_points) if abs(raw) < 1e-6), None)
+            if zero_idx is None:
+                raw_points.append(0.0)
+                gram_points.append(0.0)
+            else:
+                gram_points[zero_idx] = 0.0
+            self.calibration = fit_piecewise_overlapping(raw_points, gram_points)
+            self.calibration.save(self.calibration_path)
+            self.zero_offset = new_offset
         return self.zero_offset
 
     def add_calibration_point(self, grams: float) -> CalibrationModel:
@@ -85,7 +121,7 @@ class ScaleService:
         if not samples:
             return ScaleReading(time.time(), 0, 0.0, 0.0, False)
         raw = np.asarray([s.raw_adc for s in samples], dtype=float)
-        filtered = ema_filter(raw, self.filter_alpha)
+        filtered = self._limited_ema_series(raw)
         corrected = filtered[-1] - self.zero_offset
         grams = piecewise_predict(self.calibration, corrected)
         stable = is_stable(filtered[-60:], std_limit=90.0, slope_limit=2.0)
@@ -98,7 +134,7 @@ class ScaleService:
             samples = [s for s in samples if newest_s - (s.unix_time_ns / 1e9) <= 30.0]
         raw = np.asarray([s.raw_adc for s in samples], dtype=float)
         timestamps = [(s.unix_time_ns / 1e9) for s in samples]
-        filtered = ema_filter(raw, self.filter_alpha) if raw.size else np.asarray([])
+        filtered = self._limited_ema_series(raw) if raw.size else np.asarray([])
         grams = [piecewise_predict(self.calibration, v - self.zero_offset) for v in filtered]
         conversion_x, conversion_y = self.conversion_curve(raw, filtered)
         return {
@@ -137,6 +173,7 @@ class ScaleService:
         return {
             "zero_offset": self.zero_offset,
             "filter_alpha": self.filter_alpha,
+            "filter_window_limit": self.filter_window_limit,
             "calibration_degree": self.calibration.degree,
             "calibration_points": len(self.calibration.raw_points),
             "calibration_point_cards": self.calibration_points(),

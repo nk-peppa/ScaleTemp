@@ -29,3 +29,9 @@ def test_filters_return_expected_shapes():
     assert median_filter(values, 3).shape == values.shape
     assert ema_filter(values, 0.2).shape == values.shape
     assert reject_outliers(np.asarray([1.0, 1.1, 0.9, 99.0])).max() < 99.0
+
+
+def test_duplicate_raw_points_do_not_break_fit():
+    model = fit_piecewise_overlapping([100.0, 100.0, 100.0], [0.0, 50.0, 100.0])
+    assert model.degree == 0
+    assert np.isfinite(piecewise_predict(model, 100.0))

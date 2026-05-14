@@ -50,3 +50,11 @@ pre { white-space:pre-wrap; color:var(--accent); font-size:12px; }
 .calibration-point-card { position:relative; }
 .delete-calibration { position:absolute; top:8px; right:8px; width:24px; height:24px; padding:0; border-radius:999px; display:grid; place-items:center; line-height:1; color:#fecdd3; background:rgba(251,113,133,.13); border-color:rgba(251,113,133,.35); }
 .delete-calibration:hover { border-color:rgba(251,113,133,.8); transform:none; }
+.slider-field { display:grid; gap:8px; margin-top:16px; color:var(--muted); font-size:13px; font-weight:650; }
+.slider-field input[type="number"] { padding:8px 10px; }
+.figure-previews { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:16px; }
+.figure-preview { border:1px solid rgba(255,255,255,.08); background:rgba(8,11,18,.55); border-radius:16px; padding:10px; }
+.figure-preview img { width:100%; max-height:220px; object-fit:contain; background:white; border-radius:10px; }
+.step-list { display:grid; gap:10px; margin:14px 0; }
+.step-item { padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:14px; color:var(--muted); }
+.step-item.active { border-color:rgba(94,234,212,.55); color:#ccfbf1; background:rgba(94,234,212,.06); }

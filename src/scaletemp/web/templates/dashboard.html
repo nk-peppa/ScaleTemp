@@ -52,6 +52,10 @@
         <h3 data-i18n="filterStrength">滤波强度</h3>
         <input id="filterSlider" type="range" min="0" max="2" step="0.01" value="0.65" />
         <div class="scale"><span>Fast</span><span>Max Smooth</span></div>
+        <label class="slider-field">滤波窗口限制 / Filter window
+          <input id="filterWindowSlider" type="range" min="0" max="10000" step="10" value="10000" />
+          <input id="filterWindowInput" type="number" min="0" max="10000" step="10" value="10000" />
+        </label>
       </article>
     </aside>
   </main>

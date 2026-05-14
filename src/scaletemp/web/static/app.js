@@ -20,13 +20,19 @@ const chartOptions = {
   }
 };
 
-function makeTimeChart(id, datasets){
-  return new Chart(document.getElementById(id), {type:'line', data:{labels:[], datasets}, options:chartOptions});
+function makeTimeChart(id, datasets, extraOptions = {}){
+  const options = JSON.parse(JSON.stringify(chartOptions));
+  Object.assign(options, extraOptions);
+  return new Chart(document.getElementById(id), {type:'line', data:{labels:[], datasets}, options});
 }
 
+let weightAxisMin = -10;
+let weightAxisMax = 300;
 const weightChart = makeTimeChart('weightChart', [
   {label:'grams', borderColor:'#5eead4', data:[], pointRadius:0, tension:.25}
 ]);
+weightChart.options.scales.y.min = weightAxisMin;
+weightChart.options.scales.y.max = weightAxisMax;
 const rawChart = makeTimeChart('rawChart', [
   {label:'raw', borderColor:'#60a5fa', data:[], pointRadius:0},
   {label:'filtered', borderColor:'#a78bfa', data:[], pointRadius:0}
@@ -70,6 +76,15 @@ async function refresh(){
 
   weightChart.data.labels = labels;
   weightChart.data.datasets[0].data = data.grams;
+  const finiteGrams = data.grams.filter(Number.isFinite);
+  if (finiteGrams.length) {
+    const minGram = Math.min(...finiteGrams);
+    const maxGram = Math.max(...finiteGrams);
+    if (minGram < weightAxisMin) weightAxisMin = Math.floor(minGram / 10) * 10;
+    if (maxGram > weightAxisMax) weightAxisMax = Math.ceil(maxGram / 10) * 10;
+    weightChart.options.scales.y.min = weightAxisMin;
+    weightChart.options.scales.y.max = weightAxisMax;
+  }
   weightChart.update();
 
   rawChart.data.labels = labels;
@@ -108,6 +123,18 @@ document.getElementById('filterSlider').oninput = async e => {
   body.append('strength', e.target.value);
   await fetch('/api/filter',{method:'POST', body});
 };
+
+async function setFilterWindowLimit(value){
+  const clamped = Math.min(Math.max(Number(value) || 0, 0), 10000);
+  document.getElementById('filterWindowSlider').value = clamped;
+  document.getElementById('filterWindowInput').value = clamped;
+  const body = new FormData();
+  body.append('limit', clamped);
+  await fetch('/api/filter-window',{method:'POST', body});
+}
+
+document.getElementById('filterWindowSlider').oninput = e => setFilterWindowLimit(e.target.value);
+document.getElementById('filterWindowInput').onchange = e => setFilterWindowLimit(e.target.value);
 
 document.getElementById('calibrationForm').onsubmit = async e => {
   e.preventDefault();
