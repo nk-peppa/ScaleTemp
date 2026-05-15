@@ -32,13 +32,15 @@ class CalibrationModel:
 def _finite_unique_points(raw: Iterable[float], grams: Iterable[float]) -> tuple[np.ndarray, np.ndarray]:
     x0 = np.asarray(list(raw), dtype=float)
     y0 = np.asarray(list(grams), dtype=float)
-    if x0.size != y0.size or x0.size == 0:
-        raise ValueError("raw and gram calibration points must have the same non-zero length")
+    if x0.size != y0.size:
+        raise ValueError("raw and gram calibration points must have the same length")
+    if x0.size == 0:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
     finite = np.isfinite(x0) & np.isfinite(y0)
     x0 = x0[finite]
     y0 = y0[finite]
     if x0.size == 0:
-        raise ValueError("calibration points must contain finite values")
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
 
     order = np.argsort(x0)
     x0 = x0[order]
@@ -59,6 +61,8 @@ def _finite_unique_points(raw: Iterable[float], grams: Iterable[float]) -> tuple
 
 
 def _safe_polyfit(x: np.ndarray, y: np.ndarray, degree: int) -> list[float]:
+    if x.size == 0:
+        return [0.0]
     degree = min(degree, max(0, x.size - 1))
     if x.size == 1 or degree <= 0:
         return [float(y[0])]
@@ -83,6 +87,8 @@ def fit_piecewise_overlapping(raw: Iterable[float], grams: Iterable[float]) -> C
     """
 
     x, y = _finite_unique_points(raw, grams)
+    if x.size == 0:
+        return CalibrationModel([], [], [0.0], 0)
     degree = min(3, max(0, x.size - 1))
     coeffs = _safe_polyfit(x, y, degree)
     return CalibrationModel(x.tolist(), y.tolist(), coeffs, min(degree, len(coeffs) - 1))
@@ -90,6 +96,8 @@ def fit_piecewise_overlapping(raw: Iterable[float], grams: Iterable[float]) -> C
 
 def piecewise_predict(model: CalibrationModel, raw_value: float) -> float:
     x, y = _finite_unique_points(model.raw_points, model.gram_points)
+    if x.size == 0:
+        return float("nan")
     if x.size < 4:
         return float(np.polyval(model.coefficients, raw_value))
     predictions: list[float] = []
@@ -104,6 +112,8 @@ def piecewise_predict(model: CalibrationModel, raw_value: float) -> float:
 
 def polynomial_rmse(raw: Iterable[float], grams: Iterable[float], max_order: int = 5) -> dict[int, float]:
     x, y = _finite_unique_points(raw, grams)
+    if x.size == 0:
+        return {}
     rmses: dict[int, float] = {}
     for degree in range(1, min(max_order, x.size - 1) + 1):
         coeffs = _safe_polyfit(x, y, degree)

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import io
 import socket
 import uuid
+import zipfile
 from typing import Annotated, AsyncIterator
 
-from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, Form, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -70,7 +72,7 @@ def readings() -> dict:
 
 @app.post("/api/tare")
 def tare() -> dict:
-    return {"zero_offset": service.tare()}
+    return {"zero_offset": service.tare(), "calibration_points": service.calibration_points(), "calibrated": service.is_calibrated(), "calibration_version": service.calibration_version}
 
 
 @app.post("/api/filter")
@@ -87,8 +89,11 @@ def filter_window(limit: Annotated[float, Form()]) -> dict:
 
 @app.post("/api/calibration-point")
 def calibration_point(grams: Annotated[float, Form()]) -> dict:
-    model = service.add_calibration_point(grams)
-    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points()}
+    try:
+        model = service.add_calibration_point(grams)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points(), "calibration_version": service.calibration_version, "calibrated": service.is_calibrated()}
 
 
 @app.delete("/api/calibration-point/{index}")
@@ -97,7 +102,13 @@ def delete_calibration_point(index: int) -> dict:
         model = service.remove_calibration_point(index)
     except IndexError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points()}
+    return {"degree": model.degree, "points": len(model.raw_points), "coefficients": model.coefficients, "calibration_points": service.calibration_points(), "calibration_version": service.calibration_version, "calibrated": service.is_calibrated()}
+
+
+@app.delete("/api/calibration-points")
+def clear_calibration_points() -> dict:
+    model = service.clear_calibration_points()
+    return {"degree": model.degree, "points": 0, "coefficients": model.coefficients, "calibration_points": [], "calibration_version": service.calibration_version, "calibrated": False}
 
 
 def _guided_steps(name: str, masses: str, trials: int) -> list[dict]:
@@ -188,13 +199,33 @@ def run_experiment(name: str, duration_s: Annotated[float, Form()] = 5.0, masses
     return JSONResponse(result.__dict__)
 
 
-@app.get("/download")
-def download(path: str) -> FileResponse:
+def _safe_data_path(path: str) -> Path:
     target = Path(path).resolve()
     data_root = Path("data").resolve()
     if data_root not in target.parents and target != data_root:
         raise HTTPException(status_code=400, detail="download path must be inside data directory")
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="file not found")
+    return target
+
+
+@app.get("/download")
+def download(path: str) -> FileResponse:
+    target = _safe_data_path(path)
     return FileResponse(target, filename=target.name)
+
+
+@app.get("/download-bundle")
+def download_bundle(kind: str = Query(pattern="^(png|pdf)$"), paths: list[str] = Query(default=[])) -> StreamingResponse:
+    selected = [_safe_data_path(path) for path in paths if path.endswith(f".{kind}")]
+    if not selected:
+        raise HTTPException(status_code=404, detail=f"no {kind} files selected")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in selected:
+            zf.write(path, arcname=path.name)
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=scaletemp_{kind}_figures.zip"})
 
 
 def main() -> None:

@@ -6,10 +6,14 @@ from scipy import signal
 
 def moving_average(values: np.ndarray, window: int) -> np.ndarray:
     window = max(1, int(window))
-    if window == 1:
-        return values.astype(float)
-    kernel = np.ones(window) / window
-    return np.convolve(values, kernel, mode="same")
+    values = values.astype(float)
+    if window == 1 or values.size == 0:
+        return values
+    left = window // 2
+    right = window - 1 - left
+    padded = np.pad(values, (left, right), mode="edge")
+    kernel = np.ones(window, dtype=float) / window
+    return np.convolve(padded, kernel, mode="valid")
 
 
 def median_filter(values: np.ndarray, window: int) -> np.ndarray:

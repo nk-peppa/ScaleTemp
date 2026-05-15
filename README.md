@@ -8,7 +8,7 @@ ScaleTemp 是一个以 **C 底层采集 + Python 中间处理 + FastAPI 网页�
 - **中间处理**：默认三阶拟合；校准点少于 4 个时使用 `n-1` 阶；点数大于等于 4 时支持相邻 4 点重叠三阶拟合并对重叠预测取平均。
 - **现代黑色主题 Web 仪表盘**：实时重量、原始/滤波曲线、原始到克重转换、stable/unstable、校准点保存、滤波强度调节、中文/英文切换、去皮、刷新。
 - **实验数据测算入口**：独立页面引导用户进行 Calibration、Filtering、Dynamic Response、Repeatability、Creep/Drift、Auto-zero 实验。
-- **自动输出**：原始 CSV、处理 CSV、SVG/PDF 科研风格图像、JSON 日志。
+- **自动输出**：原始 CSV、处理 CSV、PNG/PDF 科研风格图像、JSON 日志。
 
 ## 目录结构
 
@@ -23,7 +23,7 @@ scripts/start_web.sh              # 一键启动 Web
 scripts/run_experiments.sh         # 一键启动命令行实验助手
 data/raw_data/                    # 自动保存原始实验数据
 data/processed_data/              # 自动保存处理后数据
-data/figures/                     # 自动保存 SVG/PDF 图像
+data/figures/                     # 自动保存 PNG/PDF 图像
 data/calibration/                 # 校准模型
 data/logs/                        # 实验元数据日志
 ```
@@ -112,7 +112,7 @@ http://<Orange-Pi-IP>:8000
 2. 在 **校准** 卡片中输入当前砝码克重，点击 **保存校准点**。
 3. 调节 **滤波强度**：左侧偏快速响应，右侧偏平滑。
 4. 点击 **实验数据测算** 进入独立实验工作流页面。
-5. 实验结束后页面会显示 CSV、SVG、PDF 下载链接。
+ 5. 实验结束后页面会显示 CSV、PNG、PDF 下载链接。
 
 ## 实验工作流说明
 

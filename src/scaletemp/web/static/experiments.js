@@ -84,13 +84,20 @@ async function countdown(){
 function renderResult(result){
   const figEntries = result.figures.flatMap(f=>Object.values(f));
   const links = figEntries.map(p => `<a href="/download?path=${encodeURIComponent(p)}">下载 ${p.split('/').pop()}</a>`);
-  const previews = figEntries.filter(p => p.endsWith('.svg')).map(p => `
-    <div class="figure-preview"><img src="/download?path=${encodeURIComponent(p)}" alt="${p.split('/').pop()}" /><a href="/download?path=${encodeURIComponent(p)}">${p.split('/').pop()}</a></div>
+  const pngFiles = figEntries.filter(p => p.endsWith('.png'));
+  const pdfFiles = figEntries.filter(p => p.endsWith('.pdf'));
+  const bundleQuery = files => files.map(p => `paths=${encodeURIComponent(p)}`).join('&');
+  const previews = pngFiles.map(p => `
+    <div class="figure-preview"><img class="preview-image" data-full="/download?path=${encodeURIComponent(p)}" src="/download?path=${encodeURIComponent(p)}" alt="${p.split('/').pop()}" /><a href="/download?path=${encodeURIComponent(p)}">${p.split('/').pop()}</a></div>
   `).join('');
   document.getElementById('result').innerHTML = `
     <h3>Completed: ${result.name}</h3>
     <p>Raw CSV: <a href="/download?path=${encodeURIComponent(result.raw_csv)}">download</a></p>
     <p>Processed CSV: <a href="/download?path=${encodeURIComponent(result.processed_csv)}">download</a></p>
+    <div class="bundle-actions">
+      ${pngFiles.length ? `<a class="button primary" href="/download-bundle?kind=png&${bundleQuery(pngFiles)}">一键下载 PNG</a>` : ''}
+      ${pdfFiles.length ? `<a class="button" href="/download-bundle?kind=pdf&${bundleQuery(pdfFiles)}">一键下载 PDF</a>` : ''}
+    </div>
     <div>${links.join('')}</div>
     <div class="figure-previews">${previews}</div>
     <pre>${JSON.stringify(result.metadata,null,2)}</pre>`;
@@ -127,3 +134,14 @@ document.getElementById('captureStep').onclick = async () => {
     renderSteps();
   }
 };
+
+
+const modal = document.getElementById('imageModal');
+const modalImage = document.getElementById('modalImage');
+document.getElementById('result').addEventListener('click', event => {
+  const img = event.target.closest('.preview-image');
+  if (!img) return;
+  modalImage.src = img.dataset.full;
+  modal.classList.add('open');
+});
+modal.addEventListener('click', () => modal.classList.remove('open'));

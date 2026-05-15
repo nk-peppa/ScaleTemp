@@ -24,13 +24,13 @@ def setup_style() -> None:
 
 def save_figure(fig: plt.Figure, folder: Path, name: str) -> dict[str, str]:
     folder.mkdir(parents=True, exist_ok=True)
-    svg = folder / f"{name}.svg"
+    png = folder / f"{name}.png"
     pdf = folder / f"{name}.pdf"
     fig.tight_layout()
-    fig.savefig(svg)
+    fig.savefig(png)
     fig.savefig(pdf)
     plt.close(fig)
-    return {"svg": str(svg), "pdf": str(pdf)}
+    return {"png": str(png), "pdf": str(pdf)}
 
 
 def line_plot(x: Iterable[float], series: dict[str, Iterable[float]], title: str, xlabel: str, ylabel: str, folder: Path, name: str) -> dict[str, str]:

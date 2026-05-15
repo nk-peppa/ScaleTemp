@@ -58,3 +58,9 @@ pre { white-space:pre-wrap; color:var(--accent); font-size:12px; }
 .step-list { display:grid; gap:10px; margin:14px 0; }
 .step-item { padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:14px; color:var(--muted); }
 .step-item.active { border-color:rgba(94,234,212,.55); color:#ccfbf1; background:rgba(94,234,212,.06); }
+.danger-button { margin-top:12px; color:#fecdd3; background:rgba(251,113,133,.12); border-color:rgba(251,113,133,.38); }
+.modal-backdrop { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:20; background:rgba(0,0,0,.78); backdrop-filter:blur(8px); padding:24px; }
+.modal-backdrop.open { display:flex; }
+.modal-content { max-width:min(1100px, 96vw); max-height:92vh; background:#0b1020; border:1px solid rgba(255,255,255,.12); border-radius:20px; padding:16px; }
+.modal-content img { max-width:100%; max-height:82vh; object-fit:contain; background:white; border-radius:12px; }
+.bundle-actions { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
