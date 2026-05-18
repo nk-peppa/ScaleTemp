@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ScaleTemp Experiments</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="dot purple"></span><div><b>实验数据测算</b><small>Interactive workflow assistant</small></div></div>
+  <nav class="actions"><a class="button" href="/">返回仪表盘</a></nav>
+</header>
+<main class="experiment-shell">
+  <section class="workflow-card">
+    <h1>HX711 + CZL611N 实验助手</h1>
+    <p class="muted">选择实验后会生成专用参数与逐步提示；多砝码/多次数实验会逐个采集，最后统一生成图像。</p>
+    <div class="steps">
+      <button data-exp="calibration" data-prompt="逐个放置质量列表中的标准砝码，每个点单独采集。">[1] Calibration</button>
+      <button data-exp="filtering" data-prompt="放置稳定载荷，保持系统静止，采集噪声并比较滤波器。">[2] Filtering Test</button>
+      <button data-exp="dynamic" data-prompt="先快速放置载荷，再快速移除载荷，分阶段采集动态响应。">[3] Dynamic Response</button>
+      <button data-exp="repeatability" data-prompt="重复放置同一载荷，每次单独确认采集。">[4] Repeatability</button>
+      <button data-exp="drift" data-prompt="放置恒定载荷，长时间保持不动。">[5] Creep/Drift</button>
+      <button data-exp="auto_zero" data-prompt="移除所有重量，采集回零过程。">[6] Auto-zero</button>
+    </div>
+  </section>
+  <section class="card run-panel">
+    <h2 id="expTitle">选择实验</h2>
+    <p id="expPrompt" class="prompt">Select an experiment from the left.</p>
+    <form id="expForm" class="experiment-form">
+      <div id="dynamicFields"></div>
+      <button id="startExperiment" class="primary" type="submit">生成步骤 / Start workflow</button>
+    </form>
+    <div id="stepList" class="step-list"></div>
+    <button id="captureStep" class="primary" type="button" style="display:none">采集当前步骤</button>
+    <div id="countdown" class="countdown"></div>
+    <div id="result" class="result"></div>
+  </section>
+</main>
+<div id="imageModal" class="modal-backdrop"><div class="modal-content"><img id="modalImage" alt="preview" /></div></div>
+<script src="/static/experiments.js"></script>
+</body>
+</html>
