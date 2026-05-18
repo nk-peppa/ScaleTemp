@@ -1,5 +1,5 @@
-const zh = {refresh:'刷新页面', tare:'去皮', experiment:'实验数据测算', weightCurve:'实时重量曲线（30s）', rawFilter:'原始 / 滤波数据曲线（30s）', conversion:'实时原始数据-克重转换曲线', sensorStatus:'状态', calibration:'校准', calibrationHelp:'输入当前砝码克重，系统将保存当前稳定滤波值作为校准点。', savePoint:'保存校准点'};
-const en = {refresh:'Refresh', tare:'Tare', experiment:'Experimental Workflow', weightCurve:'Live weight curve (30s)', rawFilter:'Raw / filtered curve (30s)', conversion:'Raw-to-grams conversion', sensorStatus:'Status', calibration:'Calibration', calibrationHelp:'Enter current mass; the current filtered value is saved as a calibration point.', savePoint:'Save point'};
+const zh = {refresh:'刷新页面 / Refresh', tare:'去皮 / Tare', autoZero:'自动调零：关 / Auto-zero: OFF', experiment:'实验数据测算 / Experiments', weightCurve:'实时重量曲线（30s） / Live weight (30s)', rawFilter:'原始 / 滤波数据曲线（30s） / Raw-filtered (30s)', conversion:'实时原始数据-克重转换曲线 / Raw-to-grams', sensorStatus:'状态 / Status', calibration:'校准 / Calibration', calibrationHelp:'输入当前砝码克重，系统保存当前稳定滤波值 / Enter mass; save current filtered value.', savePoint:'保存校准点 / Save'};
+const en = zh;
 let lang = 'zh';
 let lastCalibrationVersion = null;
 
@@ -116,6 +116,9 @@ async function refresh(){
   document.getElementById('rawNow').textContent = `Raw: ${data.reading.raw_adc} | Filtered: ${data.reading.filtered_raw.toFixed(1)}`;
   const sensor = data.sensor || {};
   document.getElementById('sensorMode').textContent = `Sensor: ${sensor.mode || '--'}${sensor.error ? ' | ' + sensor.error : ''}`;
+  const autoBtn = document.getElementById('autoZeroBtn');
+  autoBtn.textContent = data.auto_zero_enabled ? '自动调零：开 / Auto-zero: ON' : '自动调零：关 / Auto-zero: OFF';
+  autoBtn.className = data.auto_zero_enabled ? 'toggle-on' : 'toggle-off';
   const badge = document.getElementById('stableBadge');
   badge.textContent = data.reading.stable ? 'STABLE' : 'UNSTABLE';
   badge.className = data.reading.stable ? 'badge stable' : 'badge unstable';
@@ -130,6 +133,13 @@ document.getElementById('tareBtn').onclick = async()=>{
   lastCalibrationVersion = data.calibration_version;
   renderCalibrationCards(data.calibration_points);
   refresh();
+};
+
+document.getElementById('autoZeroBtn').onclick = async()=>{
+  const data = await fetch('/api/auto-zero/toggle',{method:'POST'}).then(r=>r.json());
+  const btn = document.getElementById('autoZeroBtn');
+  btn.textContent = data.auto_zero_enabled ? '自动调零：开 / Auto-zero: ON' : '自动调零：关 / Auto-zero: OFF';
+  btn.className = data.auto_zero_enabled ? 'toggle-on' : 'toggle-off';
 };
 
 document.getElementById('filterSlider').oninput = async e => {

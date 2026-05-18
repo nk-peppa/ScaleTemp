@@ -8,7 +8,7 @@ const configs = {
     title: 'Calibration / 校准',
     fields: [
       ['duration_s', '每个校准点采集时长 / Duration per point (s)', 'number', '3'],
-      ['masses', '校准质量列表 / Masses (g)', 'text', '0,100,200,500,1000'],
+      ['masses', '校准质量列表 / Masses (g)', 'text', '0,100,200,300,500,1000'],
     ],
   },
   filtering: {
@@ -39,7 +39,8 @@ const configs = {
   auto_zero: {
     title: 'Auto-zero / 自动回零',
     fields: [
-      ['duration_s', '回零采集时长 / Recovery duration (s)', 'number', '20'],
+      ['duration_s', '每阶段采集时长 / Duration per phase (s)', 'number', '6'],
+      ['load_mass', '自定义负载重量 / Custom load mass (g)', 'number', '500'],
     ],
   },
 };
@@ -72,13 +73,13 @@ document.querySelectorAll('[data-exp]').forEach(btn => btn.onclick = () => {
   renderSteps();
 });
 
-async function countdown(){
+async function countdown(seconds = 3){
   const el = document.getElementById('countdown');
-  for (const n of [3,2,1]) {
-    el.textContent = n + '...';
-    await new Promise(r=>setTimeout(r,700));
+  for (let n = Math.max(1, Math.round(seconds)); n > 0; n--) {
+    el.textContent = `采集中 / Collecting: ${n}s`;
+    await new Promise(r=>setTimeout(r,1000));
   }
-  el.textContent = 'Collecting live sensor data...';
+  el.textContent = '采集完成，数据处理中... / Collection complete, processing data...';
 }
 
 function renderResult(result){
@@ -119,8 +120,10 @@ document.getElementById('expForm').onsubmit = async e => {
 
 document.getElementById('captureStep').onclick = async () => {
   if (!sessionId) return;
-  await countdown();
-  const payload = await fetch(`/api/experiment-session/${sessionId}/capture`, {method:'POST'}).then(r=>r.json());
+  const duration = Number(new FormData(document.getElementById('expForm')).get('duration_s')) || 3;
+  const request = fetch(`/api/experiment-session/${sessionId}/capture`, {method:'POST'}).then(r=>r.json());
+  await countdown(duration);
+  const payload = await request;
   if (payload.error) { document.getElementById('result').textContent = payload.error; return; }
   if (payload.done) {
     document.getElementById('countdown').textContent = 'Done';

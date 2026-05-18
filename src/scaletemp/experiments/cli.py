@@ -30,8 +30,8 @@ def main() -> None:
             if choice == "0":
                 break
             if choice == "1":
-                masses = input("Calibration masses in grams (comma separated, default 0,100,200,500,1000): ").strip()
-                mass_list = [float(x) for x in (masses or "0,100,200,500,1000").split(",")]
+                masses = input("Calibration masses in grams (comma separated, default 0,100,200,300,500,1000): ").strip()
+                mass_list = [float(x) for x in (masses or "0,100,200,300,500,1000").split(",")]
                 wait("Remove all weight / 移除所有重量")
                 result = runner.calibration(mass_list)
             elif choice == "2":

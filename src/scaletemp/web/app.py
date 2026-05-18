@@ -75,6 +75,11 @@ def tare() -> dict:
     return {"zero_offset": service.tare(), "calibration_points": service.calibration_points(), "calibrated": service.is_calibrated(), "calibration_version": service.calibration_version}
 
 
+@app.post("/api/auto-zero/toggle")
+def toggle_auto_zero() -> dict:
+    return {"auto_zero_enabled": service.toggle_auto_zero()}
+
+
 @app.post("/api/filter")
 def filter_strength(strength: Annotated[float, Form()]) -> dict:
     service.set_filter_strength(strength)
@@ -122,14 +127,20 @@ def _guided_steps(name: str, masses: str, trials: int) -> list[dict]:
             {"label": "准备并快速放置载荷 / Place load quickly", "phase": "place"},
             {"label": "快速移除载荷 / Remove load quickly", "phase": "remove"},
         ]
+    if name == "auto_zero":
+        return [
+            {"label": "清空秤面，记录 0 点 / Empty scale and record zero", "phase": "zero"},
+            {"label": "放置自定义重量负载并采集 / Place custom load", "phase": "loaded"},
+            {"label": "移除负载，等待自动调零 / Remove load and wait for auto-zero", "phase": "remove"},
+        ]
     return [{"label": "保持当前实验状态并采集 / Hold condition and collect", "phase": name}]
 
 
 @app.post("/api/experiment-session/start")
-def start_experiment_session(name: Annotated[str, Form()], duration_s: Annotated[float, Form()] = 5.0, masses: Annotated[str, Form()] = "0,100,200,500,1000", trials: Annotated[int, Form()] = 5) -> dict:
+def start_experiment_session(name: Annotated[str, Form()], duration_s: Annotated[float, Form()] = 5.0, masses: Annotated[str, Form()] = "0,100,200,300,500,1000", trials: Annotated[int, Form()] = 5, load_mass: Annotated[float, Form()] = 500.0) -> dict:
     steps = _guided_steps(name, masses, trials)
     session_id = uuid.uuid4().hex
-    guided_sessions[session_id] = {"name": name, "duration_s": duration_s, "steps": steps, "captures": [], "index": 0}
+    guided_sessions[session_id] = {"name": name, "duration_s": duration_s, "steps": steps, "captures": [], "index": 0, "load_mass": load_mass}
     return {"session_id": session_id, "name": name, "steps": steps, "current_index": 0}
 
 
@@ -158,14 +169,14 @@ def capture_experiment_step(session_id: str) -> JSONResponse:
         all_samples = []
         for capture in session["captures"]:
             all_samples.extend(capture["samples"])
-        # Reuse the existing dynamic processor by temporarily writing through a one-off helper path.
-        # The same metrics are computed from the concatenated guided phases.
         original_collect = service.sampler.collect
         service.sampler.collect = lambda _duration: all_samples  # type: ignore[method-assign]
         try:
             result = runner.dynamic(duration_s=duration * len(session["captures"]))
         finally:
             service.sampler.collect = original_collect  # type: ignore[method-assign]
+    elif name == "auto_zero":
+        result = runner.auto_zero_from_groups([capture["samples"] for capture in session["captures"]], load_mass=float(session.get("load_mass", 500.0)), duration_s=duration)
     else:
         all_samples = []
         for capture in session["captures"]:
@@ -181,7 +192,7 @@ def capture_experiment_step(session_id: str) -> JSONResponse:
 
 
 @app.post("/api/experiment/{name}")
-def run_experiment(name: str, duration_s: Annotated[float, Form()] = 5.0, masses: Annotated[str, Form()] = "0,100,200,500,1000", trials: Annotated[int, Form()] = 5) -> JSONResponse:
+def run_experiment(name: str, duration_s: Annotated[float, Form()] = 5.0, masses: Annotated[str, Form()] = "0,100,200,300,500,1000", trials: Annotated[int, Form()] = 5) -> JSONResponse:
     if name == "calibration":
         result = runner.calibration([float(x.strip()) for x in masses.split(",") if x.strip()], duration_s=duration_s)
     elif name == "filtering":

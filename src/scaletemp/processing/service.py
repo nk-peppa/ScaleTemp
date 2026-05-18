@@ -31,6 +31,8 @@ class ScaleService:
         self.calibration_path = data_dir / "calibration" / "current_calibration.json"
         self.calibration = self._load_calibration()
         self.calibration_version = 0
+        self.auto_zero_enabled = False
+        self.auto_zero_candidate_since: float | None = None
 
     def _default_calibration(self) -> CalibrationModel:
         return CalibrationModel([], [], [0.0], 0)
@@ -60,6 +62,14 @@ class ScaleService:
 
     def set_filter_window_limit(self, limit: float) -> None:
         self.filter_window_limit = min(max(float(limit), 0.0), 10000.0)
+
+    def set_auto_zero(self, enabled: bool) -> bool:
+        self.auto_zero_enabled = bool(enabled)
+        self.auto_zero_candidate_since = None
+        return self.auto_zero_enabled
+
+    def toggle_auto_zero(self) -> bool:
+        return self.set_auto_zero(not self.auto_zero_enabled)
 
     def _limited_ema_series(self, raw: np.ndarray) -> np.ndarray:
         if raw.size == 0:
@@ -140,6 +150,20 @@ class ScaleService:
         if self.is_calibrated():
             grams = float(piecewise_predict(self.calibration, filtered[-1] - self.zero_offset))
         stable = is_stable(filtered[-60:], std_limit=90.0, slope_limit=2.0)
+
+        if self.auto_zero_enabled and grams is not None:
+            now = time.time()
+            if abs(grams) <= 2.0:
+                if self.auto_zero_candidate_since is None:
+                    self.auto_zero_candidate_since = now
+                elif now - self.auto_zero_candidate_since >= 3.0:
+                    self.tare()
+                    self.auto_zero_candidate_since = None
+                    grams = 0.0
+                    filtered = self._limited_ema_series(np.asarray([s.raw_adc for s in self.sampler.snapshot(180)], dtype=float))
+            else:
+                self.auto_zero_candidate_since = None
+
         return ScaleReading(time.time(), int(raw[-1]), float(filtered[-1]), grams, stable)
 
     def chart_payload(self) -> dict:
@@ -179,6 +203,7 @@ class ScaleService:
             "calibration_version": self.calibration_version,
             "reading": self.reading().__dict__,
             "sensor": {"mode": self.sampler.mode, "command": self.sampler.command, "error": self.sampler.last_error},
+            "auto_zero_enabled": self.auto_zero_enabled,
         }
 
     def calibration_points(self) -> list[dict[str, float]]:
@@ -215,6 +240,7 @@ class ScaleService:
             "sensor_mode": self.sampler.mode,
             "sensor_command": self.sampler.command,
             "sensor_error": self.sampler.last_error,
+            "auto_zero_enabled": self.auto_zero_enabled,
         }
 
     def save_metadata(self, path: Path, extra: dict) -> None:

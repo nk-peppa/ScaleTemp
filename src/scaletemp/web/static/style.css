@@ -64,3 +64,5 @@ pre { white-space:pre-wrap; color:var(--accent); font-size:12px; }
 .modal-content { max-width:min(1100px, 96vw); max-height:92vh; background:#0b1020; border:1px solid rgba(255,255,255,.12); border-radius:20px; padding:16px; }
 .modal-content img { max-width:100%; max-height:82vh; object-fit:contain; background:white; border-radius:12px; }
 .bundle-actions { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+.toggle-off { background:linear-gradient(180deg, #2b3142, #151a24); color:#cbd5e1; }
+.toggle-on { background:linear-gradient(135deg, #059669, #14b8a6); color:#04130f; border-color:rgba(94,234,212,.65); box-shadow:0 0 24px rgba(20,184,166,.25); }

@@ -34,6 +34,37 @@ def ema_filter(values: np.ndarray, alpha: float) -> np.ndarray:
     return out
 
 
+def trimmed_mean_filter(values: np.ndarray, window: int, trim_ratio: float = 0.2) -> np.ndarray:
+    values = values.astype(float)
+    window = max(1, int(window))
+    if values.size == 0 or window == 1:
+        return values
+    half = window // 2
+    out = np.empty_like(values, dtype=float)
+    for i in range(values.size):
+        segment = values[max(0, i - half) : min(values.size, i + half + 1)]
+        ordered = np.sort(segment)
+        trim = int(len(ordered) * trim_ratio)
+        if trim > 0 and len(ordered) > 2 * trim:
+            ordered = ordered[trim:-trim]
+        out[i] = float(np.mean(ordered))
+    return out
+
+
+def window_limited_ema(values: np.ndarray, alpha: float, limit: float) -> np.ndarray:
+    values = values.astype(float)
+    if values.size == 0:
+        return values
+    out = np.empty_like(values, dtype=float)
+    for i in range(values.size):
+        history = values[: i + 1]
+        kept = history[np.abs(history - values[i]) <= limit]
+        if kept.size == 0:
+            kept = np.asarray([values[i]], dtype=float)
+        out[i] = ema_filter(kept, alpha)[-1]
+    return out
+
+
 def reject_outliers(values: np.ndarray, z_limit: float = 3.5) -> np.ndarray:
     if values.size < 3:
         return values
