@@ -171,8 +171,20 @@ class ScaleService:
         if samples:
             newest_s = samples[-1].unix_time_ns / 1e9
             samples = [s for s in samples if newest_s - (s.unix_time_ns / 1e9) <= 30.0]
-        raw = np.asarray([s.raw_adc for s in samples], dtype=float)
-        timestamps = [(s.unix_time_ns / 1e9) for s in samples]
+        raw_full = np.asarray([s.raw_adc for s in samples], dtype=float)
+        timestamps_full = [(s.unix_time_ns / 1e9) for s in samples]
+
+        # Downsample before filtering. This preserves the 30 s visual window while
+        # avoiding O(n^2) client-poll work when the window-limited filter is active.
+        max_points = 600
+        if len(timestamps_full) > max_points:
+            idx = np.linspace(0, len(timestamps_full) - 1, max_points).astype(int)
+            timestamps = [timestamps_full[i] for i in idx]
+            raw = raw_full[idx]
+        else:
+            timestamps = timestamps_full
+            raw = raw_full
+
         filtered = self._limited_ema_series(raw) if raw.size else np.asarray([])
         if self.is_calibrated():
             grams = [piecewise_predict(self.calibration, v - self.zero_offset) for v in filtered]
@@ -180,17 +192,6 @@ class ScaleService:
         else:
             grams = []
             conversion_x, conversion_y = [], []
-
-        # Downsample chart payloads to keep the dashboard responsive while keeping
-        # the processing window at 30 seconds.
-        max_points = 720
-        if len(timestamps) > max_points:
-            idx = np.linspace(0, len(timestamps) - 1, max_points).astype(int)
-            timestamps = [timestamps[i] for i in idx]
-            raw = raw[idx]
-            filtered = filtered[idx]
-            if grams:
-                grams = [grams[i] for i in idx]
 
         return {
             "t": timestamps,

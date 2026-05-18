@@ -44,6 +44,7 @@ class HX711Sampler:
         self.command = command
         self.mode = "sysfs" if "--sysfs" in self.command else "mock" if "--mock" in self.command else "wiringpi" if "--wiringpi" in self.command else self.mode
         self.history: Deque[RawSample] = deque(maxlen=history_size)
+        self.history_lock = threading.Lock()
         self.process: subprocess.Popen[str] | None = None
         self.thread: threading.Thread | None = None
         self.error_thread: threading.Thread | None = None
@@ -77,7 +78,9 @@ class HX711Sampler:
             if len(parts) != 4:
                 continue
             try:
-                self.history.append(RawSample(int(parts[0]), int(parts[1]), int(parts[2]), parts[3]))
+                sample = RawSample(int(parts[0]), int(parts[1]), int(parts[2]), parts[3])
+                with self.history_lock:
+                    self.history.append(sample)
             except ValueError:
                 continue
 
@@ -87,14 +90,18 @@ class HX711Sampler:
             self.last_error = line.strip()
 
     def snapshot(self, n: int = 200) -> list[RawSample]:
-        return list(self.history)[-n:]
+        with self.history_lock:
+            return list(self.history)[-n:]
 
     def collect(self, duration_s: float) -> list[RawSample]:
         start = time.monotonic()
-        baseline_seq = self.history[-1].sequence if self.history else -1
+        with self.history_lock:
+            baseline_seq = self.history[-1].sequence if self.history else -1
         while time.monotonic() - start < duration_s:
             time.sleep(0.02)
-        return [s for s in self.history if s.sequence > baseline_seq]
+        with self.history_lock:
+            snapshot = list(self.history)
+        return [s for s in snapshot if s.sequence > baseline_seq]
 
 
 def save_raw_csv(samples: list[RawSample], path: Path) -> None:
